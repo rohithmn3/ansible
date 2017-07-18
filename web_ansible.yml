@@ -1,0 +1,58 @@
+---
+- hosts: aws
+  connection: ssh
+  remote_user: ec2-user
+  become: yes
+  gather_facts: yes
+  tasks:
+  - name: yum update all
+    yum: name=* state=latest
+  - name: Install the HTTPD
+    yum: name=httpd state=latest
+  - name: Deploy the static website
+    copy: src=../files/index.html dest=/var/www/html/index.html owner=root group=root mode=0755 backup=yes
+
+  - name: Restart the HTTPD service
+    service: name=httpd state=restarted
+  - name: Wait for http port 80 to listen
+    wait_for: host=ec2-54-200-206-39.us-west-2.compute.amazonaws.com port=80 delay=5
+
+  - name: Install WGET
+    yum: name=wget state=latest
+
+  - name: Test the site
+    shell: /usr/bin/wget http://localhost
+    register: site_result
+  - name: Display the site output results
+    debug: var=site_result
+
+
+- hosts: localhost
+  connection: local
+  remote_user: test
+  become: yes
+  gather_facts: no
+  tasks:
+  - name: Take a snapshot backup of the website directory
+    ec2_snapshot:
+      instance_id: i-f3r4hnl3k
+      device_name: /dev/sdb
+      description: backup of the site
+      wait: no
+    register: snapshot_results
+  - name: Display snapshot output
+    debug: var=snapshot_results
+
+
+  - name: Create new template AMI from our instance
+    ec2_ami:
+      instance_id: i-f3r4hnl3k
+      wait: no
+      name: myansibleami123
+      tags:
+        Name: MyAnsibleAMI
+	Service: TestAMITemplatePlabook
+    register: ami_results
+  - name: Display the AMI results
+    debug: var=ami_results
+	
