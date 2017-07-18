@@ -65,10 +65,8 @@
       name: myansibleami123
       tags:
         Name: MyAnsibleAMI
-	Service: TestAMITemplatePlabook
+        Service: TestAMITemplatePlabook
     register: ami_results
 
   - name: DisplayAMIResult
     debug: var=ami_results
-
-
