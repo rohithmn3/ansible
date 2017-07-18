@@ -1,0 +1,74 @@
+---
+- hosts: aws
+  connection: ssh
+  remote_user: ec2-user
+  become: yes
+  gather_facts: yes
+  tasks:
+  - name: Execute all Installations 
+    yum: name={{ item }} state=latest
+    with_items:
+      - httpd
+      - wget
+    notify:
+      - CopySiteFiles
+      - RestartHTTPD
+      - WaitForSite
+      - TestSite
+      - DisplayResults
+
+  handlers:
+  - name: CopySiteFiles
+    copy: src=../files/index.html dest=/var/www/html/index.html owner=root group=root mode=0755 backup=yes
+
+  - name: RestartHTTPD
+    service: name=httpd state=restarted
+
+  - name: WaitForSite
+    wait_for: host=ec2-54-200-206-39.us-west-2.compute.amazonaws.com port=80 delay=5
+
+  - name: TestSite
+    shell: /usr/bin/wget http://localhost
+    register: site_result
+
+  - name: DisplayResults
+    debug: var=site_result
+
+
+- hosts: localhost
+  connection: local
+  remote_user: test
+  become: yes
+  gather_facts: no
+  tasks:
+  - name: Take a snapshot backup of the website directory
+    ec2_snapshot:
+      instance_id: i-f3r4hnl3k
+      device_name: /dev/sdb
+      description: backup of the site
+      wait: no
+    register: snapshot_results
+
+    notify:
+      - DisplaySnapOutput
+      - NewAMITemplate
+      - DisplayAMIResult
+
+  handlers:
+  - name: DisplaySnapOutput
+    debug: var=snapshot_results
+
+  - name: NewAMITemplate
+    ec2_ami:
+      instance_id: i-f3r4hnl3k
+      wait: no
+      name: myansibleami123
+      tags:
+        Name: MyAnsibleAMI
+	Service: TestAMITemplatePlabook
+    register: ami_results
+
+  - name: DisplayAMIResult
+    debug: var=ami_results
+
+
